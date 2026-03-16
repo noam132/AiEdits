@@ -15,21 +15,20 @@ app.get('/status', (req, res) => res.send('AI Server is Running!'));
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// --- THE CRITICAL FIX: Explicitly using v1beta to avoid the 404 ---
+// --- CHANGED TO GEMINI 3 FLASH ---
 const model = genAI.getGenerativeModel(
-    { model: "gemini-1.5-flash" },
+    { model: "gemini-3-flash-preview" },
     { apiVersion: 'v1beta' } 
 );
 
 app.post('/chat', upload.single('file'), async (req, res) => {
     try {
         let message = req.body.message || "";
-        
         let history = [];
+        
         if (req.body.history) {
             try {
                 const rawHistory = typeof req.body.history === 'string' ? JSON.parse(req.body.history) : req.body.history;
-                // Clean history for the SDK format
                 history = rawHistory.map(item => ({
                     role: item.role,
                     parts: [{ text: item.parts[0].text }]
@@ -55,8 +54,7 @@ app.post('/chat', upload.single('file'), async (req, res) => {
     }
 });
 
-// Render's public port is usually 10000
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 10000; 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server started on port ${PORT}`);
 });

@@ -9,12 +9,17 @@ const upload = multer({ limits: { fileSize: 5 * 1024 * 1024 } });
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static('.')); // Serves your index.html and assets
+app.use(express.static('.'));
 
 app.get('/status', (req, res) => res.send('AI Server is Running!'));
 
+// --- THE FORCE-FIX ---
+// We pass "v1" explicitly to avoid the "v1beta" 404 error
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const model = genAI.getGenerativeModel(
+    { model: "gemini-1.5-flash" },
+    { apiVersion: 'v1' } 
+);
 
 app.post('/chat', upload.single('file'), async (req, res) => {
     try {
@@ -24,7 +29,6 @@ app.post('/chat', upload.single('file'), async (req, res) => {
         if (req.body.history) {
             try {
                 const rawHistory = typeof req.body.history === 'string' ? JSON.parse(req.body.history) : req.body.history;
-                // Clean history for the SDK
                 history = rawHistory.map(item => ({
                     role: item.role,
                     parts: [{ text: item.parts[0].text }]

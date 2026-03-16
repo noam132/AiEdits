@@ -1,0 +1,59 @@
+body {
+    background: #090909;
+    font-family: 'Segoe UI', sans-serif;
+    margin: 0;
+}
+
+.container {
+    background: #1a1a1a;
+    padding: 20px;
+    border-radius: 15px;
+    width: 80%; /* Adjusted for sidebar */
+    max-width: 800px;
+    height: 85vh; 
+    box-shadow: 0 0 20px #00ffff55;
+    border: 1px solid #00ffff;
+    display: flex;
+    flex-direction: column;
+}
+
+#chatLog {
+    flex: 1; 
+    overflow-y: auto;
+    background: #111;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    border: 1px solid #333;
+    color: #fff;
+}
+
+.custom-file-upload {
+    background: #1a1a1a;
+    color: #00ffff;
+    border: 1px solid #00ffff;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+#messageInput {
+    flex: 1;
+    padding: 12px;
+    background: #222;
+    border: 1px solid #00ffff;
+    color: #fff;
+    border-radius: 5px;
+    outline: none;
+}
+
+#sendBtn {
+    padding: 12px 25px;
+    background: #00ffff;
+    color: #000;
+    border: none;
+    border-radius: 5px;
+    font-weight: bold;
+    cursor: pointer;
+}

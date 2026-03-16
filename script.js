@@ -30,21 +30,43 @@ function renderSidebar() {
         const item = document.createElement('div');
         const isActive = chat.id === currentChatId;
         
-        item.style = `padding: 10px; background: ${isActive ? '#111' : 'transparent'}; color: ${isActive ? '#00d4ff' : '#000'}; border-radius: 5px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: 500; transition: 0.2s; margin-bottom: 5px; border: 1px solid ${isActive ? '#00d4ff' : 'transparent'};`;
+        item.style = `padding: 10px; background: ${isActive ? '#111' : 'transparent'}; color: ${isActive ? '#00d4ff' : '#000'}; border-radius: 5px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: 500; transition: 0.2s; margin-bottom: 5px; border: 1px solid ${isActive ? '#00d4ff' : 'transparent'}; position: relative;`;
         
-        // Use ⋮ for the menu and × for quick delete
+        // Removed Red X, added toggleMenu to the 3 dots button
         item.innerHTML = `
             <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${chat.name}</span>
-            <div style="display: flex; gap: 8px;">
-                <button onclick="event.stopPropagation(); showRenameModal(${chat.id})" style="background:none; border:none; color:inherit; cursor:pointer; font-size: 18px; padding: 0 5px;">⋮</button>
-                <button onclick="event.stopPropagation(); deleteChat(${chat.id})" style="background:none; border:none; color:red; cursor:pointer; font-size: 18px; padding: 0 5px;">&times;</button>
+            <button onclick="toggleMenu(event, ${chat.id})" style="background:none; border:none; color:inherit; cursor:pointer; font-size: 18px; padding: 0 5px;">⋮</button>
+            <div id="menu-${chat.id}" class="chat-options-menu" style="display: none; position: absolute; right: 5px; top: 35px; background: #161b22; border: 1px solid #00d4ff; border-radius: 5px; z-index: 100; min-width: 100px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+                <div onclick="showRenameModal(${chat.id})" style="padding: 10px; color: #fff; border-bottom: 1px solid #333;">Rename</div>
+                <div onclick="deleteChat(${chat.id})" style="padding: 10px; color: #ff4444;">Delete</div>
             </div>
         `;
         
-        item.onclick = () => loadChat(chat.id);
+        item.onclick = (e) => {
+            if (!e.target.closest('.chat-options-menu') && e.target.tagName !== 'BUTTON') {
+                loadChat(chat.id);
+            }
+        };
         chatList.appendChild(item);
     });
 }
+
+// New function to show/hide the menu
+function toggleMenu(event, id) {
+    event.stopPropagation();
+    // Close all other menus first
+    document.querySelectorAll('.chat-options-menu').forEach(m => {
+        if (m.id !== `menu-${id}`) m.style.display = 'none';
+    });
+    
+    const menu = document.getElementById(`menu-${id}`);
+    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+// Close menu if user clicks anywhere else
+window.addEventListener('click', () => {
+    document.querySelectorAll('.chat-options-menu').forEach(m => m.style.display = 'none');
+});
 
 function loadChat(id) {
     currentChatId = id;
@@ -55,7 +77,6 @@ function loadChat(id) {
     renderSidebar();
 }
 
-// Rename Functions
 function showRenameModal(id) {
     currentChatId = id;
     const chat = chats.find(c => c.id === id);
@@ -109,7 +130,7 @@ document.getElementById("sendBtn").onclick = async () => {
     try {
         const response = await fetch("https://aiedits.onrender.com/chat", {
             method: "POST",
-            body: formData // Use FormData for file support
+            body: formData 
         });
         const data = await response.json();
         appendMessage("AI", data.reply);
@@ -118,7 +139,6 @@ document.getElementById("sendBtn").onclick = async () => {
         chat.history.push({ role: "model", parts: [{ text: data.reply }] });
         saveChats();
         
-        // Clear file input
         fileInput.value = "";
         document.getElementById('fileStatus').innerText = "";
     } catch (e) { 
@@ -140,7 +160,6 @@ function appendMessage(sender, message) {
     chatLog.scrollTop = chatLog.scrollHeight;
 }
 
-// File status helper
 document.getElementById('fileInput').onchange = function() {
     const status = document.getElementById('fileStatus');
     status.innerText = this.files[0] ? `Selected: ${this.files[0].name}` : "";

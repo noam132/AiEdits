@@ -10,16 +10,30 @@ const upload = multer({ limits: { fileSize: 5 * 1024 * 1024 } });
 app.use(cors());
 app.use(express.json());
 
-// Health check endpoint for Render
-app.get('/', (req, res) => res.send('AI Server is Running!'));
+// --- FIX: SERVE YOUR FRONTEND FILES ---
+// This line tells Express to show your index.html, style.css, and script.js
+app.use(express.static('.'));
+
+// Health check endpoint (Used by Render to see if server is alive)
+app.get('/status', (req, res) => res.send('AI Server is Running!'));
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite-preview" });
+// Note: Using the standard flash model for better stability on Render
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 app.post('/chat', upload.single('file'), async (req, res) => {
     try {
         let message = req.body.message;
-        let history = req.body.history ? JSON.parse(req.body.history) : [];
+        
+        // Handle history safely
+        let history = [];
+        if (req.body.history) {
+            try {
+                history = typeof req.body.history === 'string' ? JSON.parse(req.body.history) : req.body.history;
+            } catch (e) {
+                console.error("History parse error:", e);
+            }
+        }
         
         if (req.file) {
             const fileContent = req.file.buffer.toString('utf8');
@@ -37,7 +51,6 @@ app.post('/chat', upload.single('file'), async (req, res) => {
     }
 });
 
-// FIXED: Listen on the port Render provides
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server started on port ${PORT}`);

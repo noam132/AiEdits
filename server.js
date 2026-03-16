@@ -1,4 +1,5 @@
 const express = require('express');
+const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
@@ -9,49 +10,56 @@ const upload = multer({ limits: { fileSize: 5 * 1024 * 1024 } });
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static('.'));
+app.use(express.static('.')); //
 
-app.get('/status', (req, res) => res.send('AI Server is Running!'));
+app.get('/status', (req, res) => res.send('AI Server is Running!')); //
 
-// --- THE FORCE-FIX ---
-// We pass "v1" explicitly to avoid the "v1beta" 404 error
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// --- THE FIX: Using v1beta explicitly ---
 const model = genAI.getGenerativeModel(
     { model: "gemini-1.5-flash" },
-    { apiVersion: 'v1' } 
+    { apiVersion: 'v1beta' } 
 );
 
 app.post('/chat', upload.single('file'), async (req, res) => {
     try {
-        let message = req.body.message || "";
-        let history = [];
+        let message = req.body.message || ""; //
         
+        let history = [];
         if (req.body.history) {
             try {
-                const rawHistory = typeof req.body.history === 'string' ? JSON.parse(req.body.history) : req.body.history;
+                const rawHistory = typeof req.body.history === 'string' ? JSON.parse(req.body.history) : req.body.history; //
+                // Clean history for the SDK format
                 history = rawHistory.map(item => ({
                     role: item.role,
                     parts: [{ text: item.parts[0].text }]
                 }));
             } catch (e) {
-                console.error("History parse error:", e);
+                console.error("History parse error:", e); //
             }
         }
         
         if (req.file) {
-            const fileContent = req.file.buffer.toString('utf8');
-            message = `[FILE: ${req.file.originalname}]\n\n${fileContent}\n\nUSER: ${message || "Analyze this."}`;
+            const fileContent = req.file.buffer.toString('utf8'); //
+            message = `[FILE: ${req.file.originalname}]\n\n${fileContent}\n\nUSER: ${message || "Analyze this."}`; //
         }
 
-        const chat = model.startChat({ history: history });
-        const result = await chat.sendMessage(message);
-        const response = await result.response;
+        const chat = model.startChat({ history: history }); //
+        const result = await chat.sendMessage(message); //
+        const response = await result.response; //
         
-        res.json({ reply: response.text() });
+        res.json({ reply: response.text() }); //
     } catch (error) {
         console.error("AI Error:", error);
+        // Returns the actual error message to the chat so you can see if it persists
         res.status(500).json({ reply: "AI Error: " + error.message });
     }
+});
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server started on port ${PORT}`);
 });
 
 const PORT = process.env.PORT || 10000; 

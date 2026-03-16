@@ -8,7 +8,10 @@ const app = express();
 const upload = multer({ limits: { fileSize: 5 * 1024 * 1024 } });
 
 app.use(cors());
-app.use(express.json()); // Needed to parse the history array
+app.use(express.json());
+
+// Health check endpoint for Render
+app.get('/', (req, res) => res.send('AI Server is Running!'));
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite-preview" });
@@ -16,7 +19,6 @@ const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite-preview" 
 app.post('/chat', upload.single('file'), async (req, res) => {
     try {
         let message = req.body.message;
-        // Parse the history sent from script.js
         let history = req.body.history ? JSON.parse(req.body.history) : [];
         
         if (req.file) {
@@ -24,18 +26,19 @@ app.post('/chat', upload.single('file'), async (req, res) => {
             message = `[FILE: ${req.file.originalname}]\n\n${fileContent}\n\nUSER: ${message || "Analyze this."}`;
         }
 
-        // Initialize chat with existing history
         const chat = model.startChat({ history: history });
-
         const result = await chat.sendMessage(message);
         const response = await result.response;
         
         res.json({ reply: response.text() });
     } catch (error) {
-        console.error("❌ ERROR:", error.message);
-        res.status(500).json({ reply: "Server error. Session may have timed out." });
+        console.error("AI Error:", error);
+        res.status(500).json({ reply: "The AI is having trouble thinking. Try again." });
     }
 });
 
-const PORT = 3000;
-app.listen(PORT, () => console.log(`🚀 GeminiServer: ONLINE with Memory`));
+// FIXED: Listen on the port Render provides
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server started on port ${PORT}`);
+});

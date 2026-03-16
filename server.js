@@ -10,20 +10,19 @@ const upload = multer({ limits: { fileSize: 5 * 1024 * 1024 } });
 app.use(cors());
 app.use(express.json());
 
-// --- FIX: SERVE YOUR FRONTEND FILES ---
-// This line tells Express to show your index.html, style.css, and script.js
+// Serves index.html, style.css, and script.js automatically
 app.use(express.static('.'));
 
-// Health check endpoint (Used by Render to see if server is alive)
+// Health check endpoint for Render
 app.get('/status', (req, res) => res.send('AI Server is Running!'));
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-// Note: Using the standard flash model for better stability on Render
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+// FIX: Using -latest ensures the model is found on the stable v1 API
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
 app.post('/chat', upload.single('file'), async (req, res) => {
     try {
-        let message = req.body.message;
+        let message = req.body.message || "";
         
         // Handle history safely
         let history = [];
@@ -47,7 +46,8 @@ app.post('/chat', upload.single('file'), async (req, res) => {
         res.json({ reply: response.text() });
     } catch (error) {
         console.error("AI Error:", error);
-        res.status(500).json({ reply: "The AI is having trouble thinking. Try again." });
+        // Returns the actual error message to help troubleshooting
+        res.status(500).json({ reply: "AI Error: " + error.message });
     }
 });
 

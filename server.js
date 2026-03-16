@@ -17,8 +17,11 @@ app.use(express.static('.'));
 app.get('/status', (req, res) => res.send('AI Server is Running!'));
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-// FIX: Using -latest ensures the model is found on the stable v1 API
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+
+// --- THE FIX ---
+// We use "gemini-1.5-flash". If "v1beta" still fails, this model 
+// name is the most compatible with all API versions.
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 app.post('/chat', upload.single('file'), async (req, res) => {
     try {
@@ -29,6 +32,12 @@ app.post('/chat', upload.single('file'), async (req, res) => {
         if (req.body.history) {
             try {
                 history = typeof req.body.history === 'string' ? JSON.parse(req.body.history) : req.body.history;
+                
+                // Ensure history is in the correct format for the SDK
+                history = history.map(item => ({
+                    role: item.role,
+                    parts: item.parts
+                }));
             } catch (e) {
                 console.error("History parse error:", e);
             }
@@ -39,6 +48,7 @@ app.post('/chat', upload.single('file'), async (req, res) => {
             message = `[FILE: ${req.file.originalname}]\n\n${fileContent}\n\nUSER: ${message || "Analyze this."}`;
         }
 
+        // Initialize chat with the model
         const chat = model.startChat({ history: history });
         const result = await chat.sendMessage(message);
         const response = await result.response;
@@ -46,7 +56,7 @@ app.post('/chat', upload.single('file'), async (req, res) => {
         res.json({ reply: response.text() });
     } catch (error) {
         console.error("AI Error:", error);
-        // Returns the actual error message to help troubleshooting
+        // Returns the actual error message to the chat box for debugging
         res.status(500).json({ reply: "AI Error: " + error.message });
     }
 });

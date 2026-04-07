@@ -3,9 +3,9 @@ let currentChatId = null;
 
 const chatList = document.getElementById('chatList');
 const chatLog = document.getElementById('chatLog');
-const activeChatTitle = document.getElementById('activeChatTitle');
 const input = document.getElementById("messageInput");
 
+// --- STARTUP LOGIC ---
 if (chats.length > 0) {
     loadChat(chats[0].id);
 } else {
@@ -30,137 +30,166 @@ function renderSidebar() {
         const item = document.createElement('div');
         const isActive = chat.id === currentChatId;
         
-        item.style = `padding: 10px; background: ${isActive ? '#111' : 'transparent'}; color: ${isActive ? '#00d4ff' : '#000'}; border-radius: 5px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: 500; transition: 0.2s; margin-bottom: 5px; border: 1px solid ${isActive ? '#00d4ff' : 'transparent'}; position: relative;`;
+        item.className = `chat-item ${isActive ? 'active-chat' : ''}`;
         
-        // Removed Red X, added toggleMenu to the 3 dots button
+        // Using the God-Tier Sidebar styles from your CSS
         item.innerHTML = `
-            <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${chat.name}</span>
-            <button onclick="toggleMenu(event, ${chat.id})" style="background:none; border:none; color:inherit; cursor:pointer; font-size: 18px; padding: 0 5px;">⋮</button>
-            <div id="menu-${chat.id}" class="chat-options-menu" style="display: none; position: absolute; right: 5px; top: 35px; background: #161b22; border: 1px solid #00d4ff; border-radius: 5px; z-index: 100; min-width: 100px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
-                <div onclick="showRenameModal(${chat.id})" style="padding: 10px; color: #fff; border-bottom: 1px solid #333;">Rename</div>
-                <div onclick="deleteChat(${chat.id})" style="padding: 10px; color: #ff4444;">Delete</div>
+            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">${chat.name}</span>
+            <div style="position: relative;">
+                <button class="chat-options-btn" onclick="toggleMenu(event, ${chat.id})">⋮</button>
+                <div id="menu-${chat.id}" class="chat-options-menu">
+                    <div onclick="renameChat(event, ${chat.id})">Rename</div>
+                    <div onclick="deleteChat(event, ${chat.id})" style="color:#ff4444; font-weight:bold;">Delete</div>
+                </div>
             </div>
         `;
-        
+
+        // Click item to load chat (but not if clicking the dots)
         item.onclick = (e) => {
-            if (!e.target.closest('.chat-options-menu') && e.target.tagName !== 'BUTTON') {
+            if (!e.target.classList.contains('chat-options-btn')) {
                 loadChat(chat.id);
             }
         };
+        
         chatList.appendChild(item);
     });
 }
 
-// New function to show/hide the menu
+// --- MENU LOGIC ---
 function toggleMenu(event, id) {
     event.stopPropagation();
-    // Close all other menus first
-    document.querySelectorAll('.chat-options-menu').forEach(m => {
-        if (m.id !== `menu-${id}`) m.style.display = 'none';
-    });
-    
     const menu = document.getElementById(`menu-${id}`);
-    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    
+    // Close all other open menus first
+    document.querySelectorAll('.chat-options-menu').forEach(m => {
+        if (m !== menu) m.style.display = 'none';
+    });
+
+    // Toggle current menu
+    const isVisible = menu.style.display === 'block';
+    menu.style.display = isVisible ? 'none' : 'block';
 }
 
-// Close menu if user clicks anywhere else
-window.addEventListener('click', () => {
+// Close menus if clicking anywhere else on the screen
+window.onclick = () => {
     document.querySelectorAll('.chat-options-menu').forEach(m => m.style.display = 'none');
-});
+};
 
+// --- CHAT LOGIC ---
 function loadChat(id) {
     currentChatId = id;
     const chat = chats.find(c => c.id === id);
-    activeChatTitle.innerText = chat.name;
+    document.getElementById('activeChatTitle').innerText = chat.name;
     chatLog.innerHTML = '';
-    chat.history.forEach(m => appendMessage(m.role === 'user' ? 'You' : 'AI', m.parts[0].text));
+    
+    chat.history.forEach(m => {
+        appendMessage(m.role === 'user' ? 'You' : 'AI', m.parts[0].text);
+    });
+    
     renderSidebar();
 }
 
-function showRenameModal(id) {
-    currentChatId = id;
-    const chat = chats.find(c => c.id === id);
-    document.getElementById('renameInput').value = chat.name;
-    document.getElementById('renameModal').style.display = 'block';
-}
-
-function closeRenameModal() {
-    document.getElementById('renameModal').style.display = 'none';
-}
-
-function confirmRename() {
-    const newName = document.getElementById('renameInput').value.trim();
-    if (newName) {
-        const chat = chats.find(c => c.id === currentChatId);
-        chat.name = newName;
-        saveChats();
-        activeChatTitle.innerText = newName;
-    }
-    closeRenameModal();
-}
-
-function deleteChat(id) {
-    chats = chats.filter(c => c.id !== id);
-    if (chats.length === 0) {
-        createNewChat();
-    } else if (currentChatId === id) {
-        loadChat(chats[0].id);
-    }
-    saveChats();
-}
-
-document.getElementById('newChatBtn').onclick = createNewChat;
-
-document.getElementById("sendBtn").onclick = async () => {
-    const userMessage = input.value.trim();
-    const chat = chats.find(c => c.id === currentChatId);
-    const fileInput = document.getElementById('fileInput');
-    const file = fileInput.files[0];
-
-    if (!userMessage && !file) return;
-
-    appendMessage("You", userMessage || (file ? `Sent a file: ${file.name}` : ""));
-    input.value = "";
-    
-    const formData = new FormData();
-    if (userMessage) formData.append('message', userMessage);
-    if (file) formData.append('file', file);
-    formData.append('history', JSON.stringify(chat.history));
-
-    try {
-        const response = await fetch("https://aiedits.onrender.com/chat", {
-            method: "POST",
-            body: formData 
-        });
-        const data = await response.json();
-        appendMessage("AI", data.reply);
-        
-        if (userMessage) chat.history.push({ role: "user", parts: [{ text: userMessage }] });
-        chat.history.push({ role: "model", parts: [{ text: data.reply }] });
-        saveChats();
-        
-        fileInput.value = "";
-        document.getElementById('fileStatus').innerText = "";
-    } catch (e) { 
-        console.error(e);
-        appendMessage("AI", "Error: Connection lost."); 
-    }
-};
-
 function appendMessage(sender, message) {
     const msgDiv = document.createElement("div");
-    msgDiv.style.padding = "10px";
-    msgDiv.style.margin = "10px 0";
-    msgDiv.style.borderRadius = "8px";
-    msgDiv.style.color = "#fff";
-    msgDiv.style.backgroundColor = sender === "You" ? "#004a57" : "#222";
-    msgDiv.style.border = `1px solid ${sender === "You" ? "#00d4ff" : "#444"}`;
-    msgDiv.innerHTML = `<strong>${sender}:</strong> ${message}`;
+    // Styling the message bubble
+    msgDiv.style = `padding: 15px; margin: 15px 0; border-radius: 12px; border: 1px solid ${sender === 'You' ? '#00ffff' : '#333'}; background: ${sender === 'You' ? 'rgba(0, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.02)'};`;
+
+    // NEON CODE BLOCK LOGIC
+    let formattedText = message;
+    if (sender === "AI") {
+        formattedText = message.replace(/```([\s\S]*?)```/g, (match, code) => {
+            return `
+                <pre>
+                    <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+                    <code>${code.trim()}</code>
+                </pre>`;
+        });
+    }
+
+    msgDiv.innerHTML = `<strong style="color:#00ffff; font-size: 1.1em;">${sender}:</strong> 
+                        <div style="margin-top:8px; line-height:1.6;">${formattedText}</div>`;
+    
     chatLog.appendChild(msgDiv);
     chatLog.scrollTop = chatLog.scrollHeight;
 }
 
-document.getElementById('fileInput').onchange = function() {
-    const status = document.getElementById('fileStatus');
-    status.innerText = this.files[0] ? `Selected: ${this.files[0].name}` : "";
+function copyToClipboard(btn) {
+    const code = btn.nextElementSibling.innerText;
+    navigator.clipboard.writeText(code).then(() => {
+        const originalText = btn.innerText;
+        btn.innerText = "DONE!";
+        btn.style.background = "#00ffff";
+        btn.style.color = "#000";
+        
+        setTimeout(() => {
+            btn.innerText = originalText;
+            btn.style.background = "#000";
+            btn.style.color = "#00ffff";
+        }, 2000);
+    });
+}
+
+// --- SEND LOGIC ---
+document.getElementById("sendBtn").onclick = async () => {
+    const msg = input.value.trim();
+    const fileInput = document.getElementById("fileInput");
+    const file = fileInput.files[0];
+    
+    if (!msg && !file) return;
+
+    // Display user message
+    appendMessage("You", msg || `Sent file: ${file.name}`);
+    input.value = "";
+    
+    const chat = chats.find(c => c.id === currentChatId);
+    const formData = new FormData();
+    formData.append('message', msg);
+    formData.append('history', JSON.stringify(chat.history));
+    if (file) formData.append('file', file);
+    
+    // Reset file input
+    fileInput.value = "";
+    document.getElementById('fileStatus').innerText = "";
+
+    try {
+        const res = await fetch("/chat", { method: "POST", body: formData });
+        const data = await res.json();
+        
+        // Display AI message
+        appendMessage("AI", data.reply);
+        
+        // Save to history
+        chat.history.push({ role: "user", parts: [{ text: msg || `[File: ${file.name}]` }] });
+        chat.history.push({ role: "model", parts: [{ text: data.reply }] });
+        saveChats();
+    } catch (e) {
+        appendMessage("AI", "Server Error. Check your connection.");
+    }
 };
+
+// --- CHAT MANAGEMENT ---
+function renameChat(event, id) {
+    event.stopPropagation();
+    const newName = prompt("Enter new chat name:");
+    if (newName) {
+        const chat = chats.find(c => c.id === id);
+        chat.name = newName;
+        saveChats();
+        if (id === currentChatId) {
+            document.getElementById('activeChatTitle').innerText = newName;
+        }
+    }
+}
+
+function deleteChat(event, id) {
+    event.stopPropagation();
+    if (confirm("Are you sure you want to delete this chat?")) {
+        chats = chats.filter(c => c.id !== id);
+        if (chats.length === 0) {
+            createNewChat();
+        } else if (currentChatId === id) {
+            loadChat(chats[0].id);
+        }
+        saveChats();
+    }
+}

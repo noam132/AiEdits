@@ -67,6 +67,40 @@ body {
     border: 2px solid #000;
 }
 
+/* --- MODEL SELECTOR (NEW) --- */
+.model-selector {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    justify-content: center;
+}
+
+.model-btn {
+    padding: 10px 20px;
+    background: #000;
+    color: #00ffff;
+    border: 2px solid #00ffff;
+    border-radius: 50px; /* Pill shape */
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 13px;
+    text-transform: uppercase;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.1);
+}
+
+.model-btn:hover {
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
+    transform: translateY(-2px);
+}
+
+.model-btn.active {
+    background: #00ffff;
+    color: #000;
+    box-shadow: 0 0 20px #00ffff;
+}
+
+/* --- CHAT OPTIONS --- */
 .chat-options-btn {
     background: none;
     border: none;
@@ -86,8 +120,6 @@ body {
     z-index: 1000;
     min-width: 140px;
 }
-
-.chat-options-menu.active { display: block; }
 
 .chat-options-menu div {
     padding: 12px;
@@ -132,13 +164,13 @@ body {
     border: 1px solid #222;
 }
 
-/* --- THE NEON CODE CUBE & COPY BUTTON --- */
+/* --- CODE BLOCKS --- */
 pre {
     background: #000 !important;
     border: 1px solid #00ffff;
     border-radius: 10px;
     padding: 20px;
-    position: relative; /* Essential for the floating button */
+    position: relative;
     overflow-x: auto;
     margin: 15px 0;
     box-shadow: inset 0 0 15px rgba(0, 255, 255, 0.1);
@@ -154,7 +186,7 @@ code {
     top: 10px;
     right: 10px;
     background: #000;
-    color: #00ffff; /* Light blue neon */
+    color: #00ffff;
     border: 1px solid #00ffff;
     padding: 6px 12px;
     border-radius: 5px;
@@ -163,17 +195,15 @@ code {
     font-weight: bold;
     text-transform: uppercase;
     transition: 0.3s;
-    box-shadow: 0 0 8px rgba(0, 255, 255, 0.3);
     z-index: 5;
 }
 
 .copy-btn:hover {
     background: #00ffff;
     color: #000;
-    box-shadow: 0 0 20px #00ffff;
 }
 
-/* --- INPUT AREA (BIGGER & BETTER) --- */
+/* --- INPUT AREA --- */
 .input-area {
     display: flex;
     gap: 15px;
@@ -195,7 +225,6 @@ code {
 .custom-file-upload:hover {
     background: #00ffff;
     color: #000;
-    box-shadow: 0 0 15px #00ffff;
 }
 
 #messageInput {
@@ -235,4 +264,5 @@ code {
     #chatList { display: flex; flex-direction: row; overflow-x: auto; gap: 10px; }
     .container { height: 80vh; width: 100%; padding: 15px; }
     #sendBtn { padding: 15px 25px; font-size: 15px; }
+    .model-selector { flex-wrap: wrap; }
 }

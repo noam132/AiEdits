@@ -32,7 +32,6 @@ function renderSidebar() {
         
         item.className = `chat-item ${isActive ? 'active-chat' : ''}`;
         
-        // Using the God-Tier Sidebar styles from your CSS
         item.innerHTML = `
             <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">${chat.name}</span>
             <div style="position: relative;">
@@ -44,7 +43,6 @@ function renderSidebar() {
             </div>
         `;
 
-        // Click item to load chat (but not if clicking the dots)
         item.onclick = (e) => {
             if (!e.target.classList.contains('chat-options-btn')) {
                 loadChat(chat.id);
@@ -60,17 +58,14 @@ function toggleMenu(event, id) {
     event.stopPropagation();
     const menu = document.getElementById(`menu-${id}`);
     
-    // Close all other open menus first
     document.querySelectorAll('.chat-options-menu').forEach(m => {
         if (m !== menu) m.style.display = 'none';
     });
 
-    // Toggle current menu
     const isVisible = menu.style.display === 'block';
     menu.style.display = isVisible ? 'none' : 'block';
 }
 
-// Close menus if clicking anywhere else on the screen
 window.onclick = () => {
     document.querySelectorAll('.chat-options-menu').forEach(m => m.style.display = 'none');
 };
@@ -83,7 +78,9 @@ function loadChat(id) {
     chatLog.innerHTML = '';
     
     chat.history.forEach(m => {
-        appendMessage(m.role === 'user' ? 'You' : 'AI', m.parts[0].text);
+        // Label the AI messages based on the saved role or a default
+        const label = m.role === 'user' ? 'You' : (m.modelName || 'AI');
+        appendMessage(label, m.parts[0].text);
     });
     
     renderSidebar();
@@ -91,16 +88,16 @@ function loadChat(id) {
 
 function appendMessage(sender, message) {
     const msgDiv = document.createElement("div");
-    // Styling the message bubble
-    msgDiv.style = `padding: 15px; margin: 15px 0; border-radius: 12px; border: 1px solid ${sender === 'You' ? '#00ffff' : '#333'}; background: ${sender === 'You' ? 'rgba(0, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.02)'};`;
+    // Dynamic border color based on sender
+    const isUser = sender === 'You';
+    msgDiv.style = `padding: 15px; margin: 15px 0; border-radius: 12px; border: 1px solid ${isUser ? '#00ffff' : '#333'}; background: ${isUser ? 'rgba(0, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.02)'};`;
 
-    // NEON CODE BLOCK LOGIC
     let formattedText = message;
-    if (sender === "AI") {
+    if (!isUser) {
         formattedText = message.replace(/```([\s\S]*?)```/g, (match, code) => {
             return `
-                <pre>
-                    <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+                <pre style="position:relative; background:#000; padding:15px; border-radius:8px; border:1px solid #00ffff; color:#00ffff; overflow-x:auto;">
+                    <button class="copy-btn" onclick="copyToClipboard(this)" style="position:absolute; right:10px; top:10px; background:#000; color:#00ffff; border:1px solid #00ffff; cursor:pointer;">Copy</button>
                     <code>${code.trim()}</code>
                 </pre>`;
         });
@@ -129,41 +126,54 @@ function copyToClipboard(btn) {
     });
 }
 
-// --- SEND LOGIC ---
+// --- SEND LOGIC (Updated for Multi-AI) ---
 document.getElementById("sendBtn").onclick = async () => {
     const msg = input.value.trim();
     const fileInput = document.getElementById("fileInput");
     const file = fileInput.files[0];
     
+    // Grab the global selectedModel from index.html logic
+    const modelToUse = typeof selectedModel !== 'undefined' ? selectedModel : 'gemini';
+    const modelLabel = modelToUse.toUpperCase();
+
     if (!msg && !file) return;
 
-    // Display user message
     appendMessage("You", msg || `Sent file: ${file.name}`);
     input.value = "";
     
     const chat = chats.find(c => c.id === currentChatId);
+    
+    // If it's a new chat, name it after the first message
+    if (chat.name === "New Chat" && msg) {
+        chat.name = msg.substring(0, 20) + (msg.length > 20 ? "..." : "");
+    }
+
     const formData = new FormData();
     formData.append('message', msg);
     formData.append('history', JSON.stringify(chat.history));
+    formData.append('selectedModel', modelToUse); // SENDING MODEL TO SERVER
     if (file) formData.append('file', file);
     
-    // Reset file input
     fileInput.value = "";
     document.getElementById('fileStatus').innerText = "";
 
     try {
+        // Change '/chat' to your full Render URL if testing locally
         const res = await fetch("/chat", { method: "POST", body: formData });
         const data = await res.json();
         
-        // Display AI message
-        appendMessage("AI", data.reply);
+        appendMessage(modelLabel, data.reply);
         
-        // Save to history
+        // Save to history with the model label
         chat.history.push({ role: "user", parts: [{ text: msg || `[File: ${file.name}]` }] });
-        chat.history.push({ role: "model", parts: [{ text: data.reply }] });
+        chat.history.push({ 
+            role: "model", 
+            modelName: modelLabel, // Custom property to remember which AI replied
+            parts: [{ text: data.reply }] 
+        });
         saveChats();
     } catch (e) {
-        appendMessage("AI", "Server Error. Check your connection.");
+        appendMessage("SYSTEM", "Error connecting to AI server. Try again later.");
     }
 };
 

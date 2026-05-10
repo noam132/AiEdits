@@ -159,10 +159,7 @@ sendBtn.onclick = async () => {
     document.getElementById('fileStatus').innerText = "";
 
     try {
-        const res = await fetch("https://aiedits.onrender.com/chat", { 
-            method: "POST", 
-            body: formData 
-        });
+ const res = await fetch("https://aiedits.onrender.com/chat", {
         
         if (!res.ok) throw new Error("Server response not OK");
         

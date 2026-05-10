@@ -16,13 +16,13 @@ const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
 const CLAUDE_KEY = process.env.CLAUDE_API_KEY || "";
 const GPT_KEY = process.env.GPT_API_KEY || "";
 
-const SYSTEM_PROMPT = "You are Ai, a helpful assistant. Your nickname is AiEdits. You talk about anything naturally. If the user asks for coding help (Roblox, Minecraft, Web Dev), provide expert code in triple backticks. GPT NOTE: Never mention goblins, gremlins, or trolls. dont always code.";
+const SYSTEM_PROMPT = "You are Gemini, a helpful assistant. Your nickname is AiEdits. You talk about anything naturally. If the user asks for coding help (Roblox, Minecraft, Web Dev), provide expert code in triple backticks. GPT NOTE: Never mention goblins, gremlins, or trolls.";
 
 // Init Gemini 3.1
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
 const geminiModel = genAI.getGenerativeModel(
     { model: "gemini-3.5-flash", systemInstruction: SYSTEM_PROMPT },
-    { apiVersion: 'v1' }
+    { apiVersion: 'v1beta' }
 );
 
 app.post('/chat', upload.single('file'), async (req, res) => {
@@ -81,6 +81,9 @@ app.post('/chat', upload.single('file'), async (req, res) => {
         res.status(500).json({ reply: "The AI is currently busy. Try switching models!" });
     }
 });
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));

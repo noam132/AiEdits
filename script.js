@@ -7,29 +7,19 @@ const input = document.getElementById("messageInput");
 const sendBtn = document.getElementById("sendBtn");
 
 // --- HISTORY FORMAT ---
-// New format: { role: "user"/"model", text: "...", modelName: "..." }
-// Backward compat: also handles old Gemini format { role, parts: [{ text }] }
+// Handles both new { text } format and old Gemini { parts } format
 function getText(m) {
-    if (typeof m.text === 'string') return m.text;           // new format
-    if (m.parts?.[0]?.text) return m.parts[0].text;          // old Gemini format
+    if (typeof m.text === 'string') return m.text;
+    if (m.parts?.[0]?.text) return m.parts[0].text;
     return "";
 }
 
-// Convert stored history to the format the server needs per model
-function buildServerHistory(history, model) {
-    return history.map(m => {
-        const text = getText(m);
-        if (model === "gemini") {
-            // Gemini needs parts format
-            return { role: m.role, parts: [{ text }] };
-        } else {
-            // Claude and GPT need role: "user"/"assistant" + content string
-            return {
-                role: m.role === "model" ? "assistant" : "user",
-                content: text
-            };
-        }
-    });
+// Convert stored history to Gemini parts format for the server
+function buildServerHistory(history) {
+    return history.map(m => ({
+        role: m.role,
+        parts: [{ text: getText(m) }]
+    }));
 }
 
 // --- STARTUP ---
@@ -174,8 +164,7 @@ sendBtn.onclick = async () => {
     const fileInput = document.getElementById("fileInput");
     const file = fileInput.files[0];
 
-    const modelToUse = typeof selectedModel !== 'undefined' ? selectedModel : 'gemini';
-    const modelLabel = modelToUse.toUpperCase();
+    const modelLabel = 'GEMINI';
 
     if (!msg && !file) return;
 
@@ -192,13 +181,12 @@ sendBtn.onclick = async () => {
         chat.name = msg.substring(0, 25) + (msg.length > 25 ? "..." : "");
     }
 
-    // FIX: convert history to correct server format per model before sending
-    const serverHistory = buildServerHistory(chat.history, modelToUse);
+    const serverHistory = buildServerHistory(chat.history);
 
     const formData = new FormData();
     formData.append('message', msg);
     formData.append('history', JSON.stringify(serverHistory));
-    formData.append('selectedModel', modelToUse);
+    formData.append('selectedModel', 'gemini');
     if (file) formData.append('file', file);
 
     fileInput.value = "";

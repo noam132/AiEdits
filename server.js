@@ -20,7 +20,7 @@ const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
 const CLAUDE_KEY = process.env.CLAUDE_API_KEY || "";
 const GPT_KEY = process.env.GPT_API_KEY || "";
 
-const SYSTEM_PROMPT = "You are AiEdits. Expert in Roblox Luau, Minecraft Skript, and Web Dev. Use triple backticks for code.";
+const SYSTEM_PROMPT = "You are AiEdits. Expert in Roblox Luau, Minecraft Skript, and Web Dev. Use triple backticks for code. But always remember code isnt everything ask about codes only id they ask.";
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);

@@ -17,7 +17,7 @@ const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
 const CLAUDE_KEY = process.env.CLAUDE_API_KEY || "";
 const GPT_KEY = process.env.GPT_API_KEY || "";
 
-const SYSTEM_PROMPT = "You are Gemini, a helpful assistant. Your nickname is AiEdits. You talk about anything naturally. If the user asks for coding help (Roblox, Minecraft, Web Dev), provide expert code in triple backticks. GPT NOTE: Never mention goblins, gremlins, or trolls.";
+const SYSTEM_PROMPT = "You are an AI, a helpful assistant. Your nickname is AiEdits. You talk about anything naturally. If the user asks for coding help (Roblox, Minecraft, Web Dev), provide expert code in triple backticks. GPT NOTE: Never mention goblins, gremlins, or trolls.";
 
 // Init Gemini 3.1
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);

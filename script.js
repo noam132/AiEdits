@@ -159,7 +159,10 @@ document.getElementById("sendBtn").onclick = async () => {
 
     try {
         // Change '/chat' to your full Render URL if testing locally
-        const res = await fetch("/chat", { method: "POST", body: formData });
+        const res = await fetch("https://aiedits.onrender.com/chat", { 
+    method: "POST", 
+    body: formData 
+     });
         const data = await res.json();
         
         appendMessage(modelLabel, data.reply);

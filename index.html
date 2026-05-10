@@ -5,87 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AiEdits</title>
     <link rel="stylesheet" href="style.css">
-    <style>
-        /* New Styles for the Model Selector Buttons */
-        .model-selector {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-            justify-content: center;
-        }
-
-        .model-btn {
-            padding: 8px 16px;
-            border: 2px solid #00ffff;
-            background: transparent;
-            color: #00ffff;
-            border-radius: 20px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: all 0.3s ease;
-            font-size: 14px;
-        }
-
-        .model-btn.active {
-            background: #00ffff;
-            color: #121212;
-            box-shadow: 0 0 10px #00ffff;
-        }
-
-        .model-btn:hover {
-            background: rgba(0, 255, 255, 0.1);
-        }
-    </style>
 </head>
 <body>
-
     <div id="sidebar">
         <button id="newChatBtn" onclick="createNewChat()">+ New Chat</button>
         <div id="chatList"></div>
     </div>
-
     <div class="main-content">
         <div class="container">
             <h2 id="activeChatTitle" style="color:#00ffff; margin: 0 0 20px 0; font-size: 26px;">New Chat</h2>
-            
-            <div class="model-selector">
-                <button id="btn-gemini" class="model-btn active" onclick="selectModel('gemini')">Gemini 3.5</button>
-                <button id="btn-gpt" class="model-btn" onclick="selectModel('gpt')">GPT 5.5</button>
-                <button id="btn-claude" class="model-btn" onclick="selectModel('claude')">Opus 4.7</button>
-            </div>
+
             <div id="chatLog"></div>
-            
+
             <div class="input-area">
                 <input type="file" id="fileInput" style="display:none;" onchange="document.getElementById('fileStatus').innerText = this.files[0] ? this.files[0].name : ''">
-                
                 <button type="button" class="custom-file-upload" onclick="document.getElementById('fileInput').click()">Select File</button>
-                
                 <input type="text" id="messageInput" placeholder="Message Gemini...">
-                
                 <button id="sendBtn">Send</button>
             </div>
-            
+
             <span id="fileStatus" style="font-size: 12px; color: #00ffff; margin-top: 8px; display: block; height: 14px; font-weight: bold;"></span>
         </div>
     </div>
-
     <script>
-        // Logic to handle button switching
+        // Model is locked to Gemini only
         let selectedModel = 'gemini';
-
-        function selectModel(model) {
-            selectedModel = model;
-            
-            // Update UI: Remove active class from all, add to clicked
-            document.querySelectorAll('.model-btn').forEach(btn => btn.classList.remove('active'));
-            document.getElementById('btn-' + model).classList.add('active');
-
-            // Update Placeholder
-            const input = document.getElementById('messageInput');
-            if(model === 'gemini') input.placeholder = "Message Gemini 3.5...";
-            if(model === 'gpt') input.placeholder = "Message GPT 5.5...";
-            if(model === 'claude') input.placeholder = "Message Opus 4.7...";
-        }
     </script>
     <script src="script.js"></script>
 </body>

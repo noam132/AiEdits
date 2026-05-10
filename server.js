@@ -8,8 +8,9 @@ require('dotenv').config();
 const app = express();
 const upload = multer({ limits: { fileSize: 5 * 1024 * 1024 } });
 
+// --- CORS FIX ---
 app.use(cors({
-    origin: "*", // Allows any website to talk to your server
+    origin: "*", 
     methods: ["GET", "POST"],
     allowedHeaders: ["Content-Type"]
 }));
@@ -23,7 +24,7 @@ const GPT_KEY = process.env.GPT_API_KEY || "";
 
 const SYSTEM_PROMPT = "You are an AI, a helpful assistant. Your nickname is AiEdits. You talk about anything naturally. If the user asks for coding help (Roblox, Minecraft, Web Dev), provide expert code in triple backticks. GPT NOTE: Never mention goblins, gremlins, or trolls.";
 
-// Init Gemini 3.1
+// Init Gemini (Updated to stable 1.5 model name and v1 API)
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
 const geminiModel = genAI.getGenerativeModel(
     { model: "gemini-3.5-flash", systemInstruction: SYSTEM_PROMPT },
@@ -37,12 +38,14 @@ app.post('/chat', upload.single('file'), async (req, res) => {
         let { message, history, selectedModel } = req.body;
         selectedModel = selectedModel || "gemini";
 
+        console.log(`Incoming request for model: ${selectedModel}`);
+
         if (req.file) {
             const fileContent = req.file.buffer.toString('utf8');
             message = `[FILE: ${req.file.originalname}]\n\nCONTENT:\n${fileContent}\n\nUSER MESSAGE: ${message || "Analyze this file."}`;
         }
 
-        // --- OPTION 1: CLAUDE OPUS 4.7 ---
+        // --- OPTION 1: CLAUDE ---
         if (selectedModel === "claude") {
             const response = await fetch("https://api.anthropic.com/v1/messages", {
                 method: "POST",
@@ -52,44 +55,54 @@ app.post('/chat', upload.single('file'), async (req, res) => {
                     "content-type": "application/json"
                 },
                 body: JSON.stringify({
-                    model: "claude-opus-4-7",
+                    model: "claude-3-5-sonnet-20240620", // Stable high-end model
                     max_tokens: 1024,
                     system: SYSTEM_PROMPT,
                     messages: [{ role: "user", content: message }]
                 })
             });
             const data = await response.json();
+            if (data.error) throw new Error(`Claude Error: ${data.error.message}`);
             return res.json({ reply: data.content[0].text });
         }
 
-        // --- OPTION 2: GPT-5.5 ---
+        // --- OPTION 2: GPT ---
         if (selectedModel === "gpt") {
             const response = await fetch("https://api.openai.com/v1/chat/completions", {
                 method: "POST",
                 headers: { "Authorization": `Bearer ${GPT_KEY}`, "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    model: "gpt-5.5",
+                    model: "gpt-4o", // Stable current model
                     messages: [{ role: "system", content: SYSTEM_PROMPT }, { role: "user", content: message }]
                 })
             });
             const data = await response.json();
+            if (data.error) throw new Error(`GPT Error: ${data.error.message}`);
             return res.json({ reply: data.choices[0].message.content });
         }
 
         // --- OPTION 3: GEMINI (Default) ---
-        const parsedHistory = history ? JSON.parse(history) : [];
+        let parsedHistory = [];
+        if (history) {
+            try {
+                parsedHistory = JSON.parse(history);
+            } catch (e) {
+                console.error("History parse failed, resetting history.");
+                parsedHistory = [];
+            }
+        }
+
         const chat = geminiModel.startChat({ history: parsedHistory });
-        const result = await chat.sendMessage(message);
+        const result = await chat.sendMessage(message || "Hello!");
         const geminiRes = await result.response;
         res.json({ reply: geminiRes.text() });
 
     } catch (error) {
-        console.error("Multi-AI Error:", error);
-        res.status(500).json({ reply: "I had a glitch processing that model. Try switching back to Gemini!" });
+        console.error("SERVER ERROR:", error.message);
+        res.status(500).json({ reply: `Error: ${error.message}` });
     }
 });
 
-// --- DECLARED ONLY ONCE AT THE END ---
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);

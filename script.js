@@ -6,7 +6,33 @@ const chatLog = document.getElementById('chatLog');
 const input = document.getElementById("messageInput");
 const sendBtn = document.getElementById("sendBtn");
 
-// --- STARTUP LOGIC ---
+// --- HISTORY FORMAT ---
+// New format: { role: "user"/"model", text: "...", modelName: "..." }
+// Backward compat: also handles old Gemini format { role, parts: [{ text }] }
+function getText(m) {
+    if (typeof m.text === 'string') return m.text;           // new format
+    if (m.parts?.[0]?.text) return m.parts[0].text;          // old Gemini format
+    return "";
+}
+
+// Convert stored history to the format the server needs per model
+function buildServerHistory(history, model) {
+    return history.map(m => {
+        const text = getText(m);
+        if (model === "gemini") {
+            // Gemini needs parts format
+            return { role: m.role, parts: [{ text }] };
+        } else {
+            // Claude and GPT need role: "user"/"assistant" + content string
+            return {
+                role: m.role === "model" ? "assistant" : "user",
+                content: text
+            };
+        }
+    });
+}
+
+// --- STARTUP ---
 if (chats.length > 0) {
     loadChat(chats[0].id);
 } else {
@@ -30,9 +56,9 @@ function renderSidebar() {
     chats.forEach(chat => {
         const item = document.createElement('div');
         const isActive = chat.id === currentChatId;
-        
+
         item.className = `chat-item ${isActive ? 'active-chat' : ''}`;
-        
+
         item.innerHTML = `
             <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">${chat.name}</span>
             <div style="position: relative;">
@@ -49,7 +75,7 @@ function renderSidebar() {
                 loadChat(chat.id);
             }
         };
-        
+
         chatList.appendChild(item);
     });
 }
@@ -58,31 +84,36 @@ function renderSidebar() {
 function toggleMenu(event, id) {
     event.stopPropagation();
     const menu = document.getElementById(`menu-${id}`);
-    
+
     document.querySelectorAll('.chat-options-menu').forEach(m => {
         if (m !== menu) m.style.display = 'none';
     });
 
-    const isVisible = menu.style.display === 'block';
-    menu.style.display = isVisible ? 'none' : 'block';
+    menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
 }
 
-window.onclick = () => {
-    document.querySelectorAll('.chat-options-menu').forEach(m => m.style.display = 'none');
-};
+// FIX: use document-level click listener more safely
+document.addEventListener('click', (e) => {
+    if (!e.target.classList.contains('chat-options-btn')) {
+        document.querySelectorAll('.chat-options-menu').forEach(m => m.style.display = 'none');
+    }
+});
 
 // --- CHAT LOGIC ---
 function loadChat(id) {
     currentChatId = id;
     const chat = chats.find(c => c.id === id);
+    if (!chat) return;
+
     document.getElementById('activeChatTitle').innerText = chat.name;
     chatLog.innerHTML = '';
-    
+
     chat.history.forEach(m => {
         const label = m.role === 'user' ? 'You' : (m.modelName || 'AI');
-        appendMessage(label, m.parts[0].text);
+        const text = getText(m); // FIX: handles both old and new history formats safely
+        if (text) appendMessage(label, text);
     });
-    
+
     renderSidebar();
 }
 
@@ -93,20 +124,33 @@ function appendMessage(sender, message) {
 
     let formattedText = message;
     if (!isUser) {
-        formattedText = message.replace(/```([\s\S]*?)```/g, (match, code) => {
+        formattedText = message.replace(/```(\w*\n)?([\s\S]*?)```/g, (match, lang, code) => {
+            const langLabel = lang ? lang.trim() : '';
             return `
-                <pre style="position:relative; background:#000; padding:15px; border-radius:8px; border:1px solid #00ffff; color:#00ffff; overflow-x:auto;">
+                <pre style="position:relative; background:#000; padding:15px; border-radius:8px; border:1px solid #00ffff; color:#00ffff; overflow-x:auto; margin-top:8px;">
+                    ${langLabel ? `<span style="position:absolute; left:10px; top:10px; font-size:10px; opacity:0.6;">${langLabel}</span>` : ''}
                     <button class="copy-btn" onclick="copyToClipboard(this)" style="position:absolute; right:10px; top:10px; background:#000; color:#00ffff; border:1px solid #00ffff; cursor:pointer; padding: 4px 8px; font-size: 10px;">Copy</button>
-                    <code>${code.trim()}</code>
+                    <code style="${langLabel ? 'display:block; margin-top:20px;' : ''}">${escapeHtml(code.trim())}</code>
                 </pre>`;
         });
+        // Also render **bold** markdown
+        formattedText = formattedText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     }
 
-    msgDiv.innerHTML = `<strong style="color:#00ffff; font-size: 1.1em;">${sender}:</strong> 
+    msgDiv.innerHTML = `<strong style="color:#00ffff; font-size: 1.1em;">${sender}:</strong>
                         <div style="margin-top:8px; line-height:1.6; white-space: pre-wrap;">${formattedText}</div>`;
-    
+
     chatLog.appendChild(msgDiv);
     chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+// FIX: escape HTML in code blocks so injected HTML tags don't break the display
+function escapeHtml(str) {
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
 }
 
 function copyToClipboard(btn) {
@@ -129,7 +173,7 @@ sendBtn.onclick = async () => {
     const msg = input.value.trim();
     const fileInput = document.getElementById("fileInput");
     const file = fileInput.files[0];
-    
+
     const modelToUse = typeof selectedModel !== 'undefined' ? selectedModel : 'gemini';
     const modelLabel = modelToUse.toUpperCase();
 
@@ -138,21 +182,25 @@ sendBtn.onclick = async () => {
     sendBtn.disabled = true;
     sendBtn.innerText = "WAIT...";
 
-    appendMessage("You", msg || `Sent file: ${file.name}`);
+    const displayMsg = msg || `Sent file: ${file.name}`;
+    appendMessage("You", displayMsg);
     input.value = "";
-    
+
     const chat = chats.find(c => c.id === currentChatId);
-    
+
     if (chat.name === "New Chat" && msg) {
-        chat.name = msg.substring(0, 20) + (msg.length > 20 ? "..." : "");
+        chat.name = msg.substring(0, 25) + (msg.length > 25 ? "..." : "");
     }
+
+    // FIX: convert history to correct server format per model before sending
+    const serverHistory = buildServerHistory(chat.history, modelToUse);
 
     const formData = new FormData();
     formData.append('message', msg);
-    formData.append('history', JSON.stringify(chat.history));
+    formData.append('history', JSON.stringify(serverHistory));
     formData.append('selectedModel', modelToUse);
     if (file) formData.append('file', file);
-    
+
     fileInput.value = "";
     document.getElementById('fileStatus').innerText = "";
 
@@ -162,21 +210,32 @@ sendBtn.onclick = async () => {
             body: formData
         });
 
-        if (!res.ok) throw new Error("Server response not OK");
-        
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+
         const data = await res.json();
         appendMessage(modelLabel, data.reply);
-        
-        chat.history.push({ role: "user", parts: [{ text: msg || `[File: ${file.name}]` }] });
-        chat.history.push({ 
-            role: "model", 
-            modelName: modelLabel, 
-            parts: [{ text: data.reply }] 
+
+        // FIX: store in new unified format { role, text, modelName }
+        // This avoids the Gemini-specific parts format and works for all models
+        chat.history.push({
+            role: "user",
+            text: msg || `[File: ${file?.name || 'unknown'}]`
         });
+        chat.history.push({
+            role: "model",
+            text: data.reply,
+            modelName: modelLabel
+        });
+
+        // FIX: cap history at last 40 messages (~20 turns) to avoid localStorage overflow
+        if (chat.history.length > 40) {
+            chat.history = chat.history.slice(chat.history.length - 40);
+        }
+
         saveChats();
     } catch (e) {
         console.error("Fetch error:", e);
-        appendMessage("SYSTEM", "Error connecting to AI server. Make sure the Render service is awake!");
+        appendMessage("SYSTEM", `Error: ${e.message}. Make sure the Render service is awake!`);
     } finally {
         sendBtn.disabled = false;
         sendBtn.innerText = "Send";
@@ -187,12 +246,12 @@ sendBtn.onclick = async () => {
 function renameChat(event, id) {
     event.stopPropagation();
     const newName = prompt("Enter new chat name:");
-    if (newName) {
+    if (newName && newName.trim()) {
         const chat = chats.find(c => c.id === id);
-        chat.name = newName;
+        chat.name = newName.trim();
         saveChats();
         if (id === currentChatId) {
-            document.getElementById('activeChatTitle').innerText = newName;
+            document.getElementById('activeChatTitle').innerText = chat.name;
         }
     }
 }

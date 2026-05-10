@@ -93,7 +93,6 @@ function appendMessage(sender, message) {
 
     let formattedText = message;
     if (!isUser) {
-        // Neon Code Block formatting
         formattedText = message.replace(/```([\s\S]*?)```/g, (match, code) => {
             return `
                 <pre style="position:relative; background:#000; padding:15px; border-radius:8px; border:1px solid #00ffff; color:#00ffff; overflow-x:auto;">
@@ -136,7 +135,6 @@ sendBtn.onclick = async () => {
 
     if (!msg && !file) return;
 
-    // Loading State
     sendBtn.disabled = true;
     sendBtn.innerText = "WAIT...";
 
@@ -159,8 +157,11 @@ sendBtn.onclick = async () => {
     document.getElementById('fileStatus').innerText = "";
 
     try {
- const res = await fetch("https://aiedits.onrender.com/chat", {
-        
+        const res = await fetch("https://aiedits.onrender.com/chat", {
+            method: "POST",
+            body: formData
+        });
+
         if (!res.ok) throw new Error("Server response not OK");
         
         const data = await res.json();

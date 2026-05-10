@@ -50,7 +50,7 @@
             
             <div class="model-selector">
                 <button id="btn-gemini" class="model-btn active" onclick="selectModel('gemini')">Gemini 3.5</button>
-                <button id="btn-gpt" class="model-btn" onclick="selectModel('gpt')">GPT-5.5</button>
+                <button id="btn-gpt" class="model-btn" onclick="selectModel('gpt')">GPT 5.5</button>
                 <button id="btn-claude" class="model-btn" onclick="selectModel('claude')">Opus 4.7</button>
             </div>
             <div id="chatLog"></div>
@@ -83,7 +83,7 @@
             // Update Placeholder
             const input = document.getElementById('messageInput');
             if(model === 'gemini') input.placeholder = "Message Gemini 3.5...";
-            if(model === 'gpt') input.placeholder = "Message GPT-5.5...";
+            if(model === 'gpt') input.placeholder = "Message GPT 5.5...";
             if(model === 'claude') input.placeholder = "Message Opus 4.7...";
         }
     </script>

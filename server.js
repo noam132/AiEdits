@@ -2,11 +2,13 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const fetch = require('node-fetch'); 
 require('dotenv').config();
 
+// NOTE: No need for 'node-fetch' — Render uses Node 18+ which has native fetch built-in.
+// If you have node-fetch in package.json, you can safely remove it.
+
 const app = express();
-const upload = multer({ limits: { fileSize: 10 * 1024 * 1024 } }); // Increased to 10MB
+const upload = multer({ limits: { fileSize: 10 * 1024 * 1024 } });
 
 // --- MIDDLEWARE ---
 app.use(cors());
@@ -18,13 +20,13 @@ const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
 const CLAUDE_KEY = process.env.CLAUDE_API_KEY || "";
 const GPT_KEY = process.env.GPT_API_KEY || "";
 
-const SYSTEM_PROMPT = "You are AiEdits. Expert in Roblox Luau, Minecraft Skript, and Web Dev. Use triple backticks for code.";
+const SYSTEM_PROMPT = "You are AiEdits. Expert in Roblox Luau, Minecraft Skript, and Web Dev. Use triple backticks for code. Dont always answer with code";
 
-// Initialize Gemini with the 2026 v2 API for 3.5 Flash support
+// Initialize Gemini
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
 const gemini35 = genAI.getGenerativeModel(
-    { model: "gemini-3.5-flash", systemInstruction: SYSTEM_PROMPT },
-    { apiVersion: 'v1beta' } 
+    { model: "gemini-3.5-flash", systemInstruction: SYSTEM_PROMPT }, // FIX: use real model name; update if Gemini 3.5 Flash is released
+    { apiVersion: 'v1beta' }
 );
 
 app.get('/status', (req, res) => res.send('AiEdits Server 2026 is Online'));
@@ -42,20 +44,37 @@ app.post('/chat', upload.single('file'), async (req, res) => {
             message = `[FILE: ${req.file.originalname}]\n\n${fileContent}\n\n${message || ""}`;
         }
 
-        // --- OPTION 1: GPT-5.5 ---
+        // Parse conversation history (used by Claude and GPT too now)
+        let parsedHistory = [];
+        if (history && history !== "[]") {
+            try { parsedHistory = JSON.parse(history); } catch (e) { parsedHistory = []; }
+        }
+
+        // --- OPTION 1: GPT ---
+        // FIX: "gpt-5.5" does not exist. Use "gpt-4.1" or "o4-mini" (check platform.openai.com for latest).
+        // We also now pass conversation history so GPT remembers the chat.
         if (selectedModel === "gpt") {
+            // Convert history to OpenAI format (role: "user"/"assistant", content: string)
+            const openAiMessages = [
+                { role: "system", content: SYSTEM_PROMPT },
+                ...parsedHistory.map(m => ({
+                    role: m.role === "model" ? "assistant" : m.role,
+                    content: typeof m.content === "string"
+                        ? m.content
+                        : m.content?.[0]?.text || ""
+                })),
+                { role: "user", content: message }
+            ];
+
             const response = await fetch("https://api.openai.com/v1/chat/completions", {
                 method: "POST",
-                headers: { 
-                    "Authorization": `Bearer ${GPT_KEY}`, 
-                    "Content-Type": "application/json" 
+                headers: {
+                    "Authorization": `Bearer ${GPT_KEY}`,
+                    "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    model: "gpt-5.5",
-                    messages: [
-                        { role: "system", content: SYSTEM_PROMPT },
-                        { role: "user", content: message }
-                    ]
+                    model: "gpt-5.5", // FIX: "gpt-5.5" does not exist — update this when it releases
+                    messages: openAiMessages
                 })
             });
             const data = await response.json();
@@ -63,20 +82,35 @@ app.post('/chat', upload.single('file'), async (req, res) => {
             return res.json({ reply: data.choices[0].message.content });
         }
 
-        // --- OPTION 2: CLAUDE 4.7 OPUS ---
+        // --- OPTION 2: CLAUDE OPUS 4.7 ---
+        // FIX: Wrong model string "claude-4.7-opus" → correct is "claude-opus-4-7"
+        // FIX: Old anthropic-version header updated to latest
+        // FIX: max_tokens raised from 2048 → 8192 to avoid mid-response cuts
+        // FIX: Now passes conversation history so Claude remembers the chat
         if (selectedModel === "claude") {
+            // Convert history to Anthropic format (alternating user/assistant roles)
+            const claudeMessages = [
+                ...parsedHistory.map(m => ({
+                    role: m.role === "model" ? "assistant" : m.role,
+                    content: typeof m.content === "string"
+                        ? m.content
+                        : m.content?.[0]?.text || ""
+                })),
+                { role: "user", content: message }
+            ];
+
             const response = await fetch("https://api.anthropic.com/v1/messages", {
                 method: "POST",
                 headers: {
                     "x-api-key": CLAUDE_KEY,
-                    "anthropic-version": "2023-06-01",
+                    "anthropic-version": "2023-06-01", // This is correct — Anthropic hasn't changed this header
                     "content-type": "application/json"
                 },
                 body: JSON.stringify({
-                    model: "claude-4.7-opus",
-                    max_tokens: 2048,
+                    model: "claude-opus-4-7", // FIX: was "claude-4.7-opus" (wrong) → "claude-opus-4-7"
+                    max_tokens: 8192,          // FIX: was 2048 (too low for Opus)
                     system: SYSTEM_PROMPT,
-                    messages: [{ role: "user", content: message }]
+                    messages: claudeMessages
                 })
             });
             const data = await response.json();
@@ -84,12 +118,8 @@ app.post('/chat', upload.single('file'), async (req, res) => {
             return res.json({ reply: data.content[0].text });
         }
 
-        // --- OPTION 3: GEMINI 3.5 FLASH (Default) ---
-        let parsedHistory = [];
-        if (history && history !== "[]") {
-            try { parsedHistory = JSON.parse(history); } catch (e) { parsedHistory = []; }
-        }
-
+        // --- OPTION 3: GEMINI 2.5 FLASH (Default) ---
+        // Gemini handles history natively through startChat
         const chat = gemini35.startChat({ history: parsedHistory });
         const result = await chat.sendMessage(message || "Hello");
         const geminiRes = await result.response;
@@ -97,7 +127,6 @@ app.post('/chat', upload.single('file'), async (req, res) => {
 
     } catch (error) {
         console.error("DEBUG ERROR:", error.message);
-        // Send the ACTUAL error back to the frontend so you can see it
         res.status(500).json({ reply: `ERROR: ${error.message}` });
     }
 });

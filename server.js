@@ -10,8 +10,9 @@ const upload = multer({ limits: { fileSize: 5 * 1024 * 1024 } });
 
 app.use(cors());
 app.use(express.json());
+app.use(express.static('.'));
 
-// --- API KEYS FROM RENDER ---
+// --- API KEYS ---
 const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
 const CLAUDE_KEY = process.env.CLAUDE_API_KEY || "";
 const GPT_KEY = process.env.GPT_API_KEY || "";
@@ -25,6 +26,8 @@ const geminiModel = genAI.getGenerativeModel(
     { apiVersion: 'v1beta' }
 );
 
+app.get('/status', (req, res) => res.send('Multi-AI Server is Running!'));
+
 app.post('/chat', upload.single('file'), async (req, res) => {
     try {
         let { message, history, selectedModel } = req.body;
@@ -35,7 +38,7 @@ app.post('/chat', upload.single('file'), async (req, res) => {
             message = `[FILE: ${req.file.originalname}]\n\nCONTENT:\n${fileContent}\n\nUSER MESSAGE: ${message || "Analyze this file."}`;
         }
 
-        // --- CLAUDE OPUS 4.7 ---
+        // --- OPTION 1: CLAUDE OPUS 4.7 ---
         if (selectedModel === "claude") {
             const response = await fetch("https://api.anthropic.com/v1/messages", {
                 method: "POST",
@@ -55,7 +58,7 @@ app.post('/chat', upload.single('file'), async (req, res) => {
             return res.json({ reply: data.content[0].text });
         }
 
-        // --- GPT-5.5 SPUD ---
+        // --- OPTION 2: GPT-5.5 ---
         if (selectedModel === "gpt") {
             const response = await fetch("https://api.openai.com/v1/chat/completions", {
                 method: "POST",
@@ -69,7 +72,7 @@ app.post('/chat', upload.single('file'), async (req, res) => {
             return res.json({ reply: data.choices[0].message.content });
         }
 
-        // --- GEMINI 3.1 FLASH (DEFAULT) ---
+        // --- OPTION 3: GEMINI (Default) ---
         const parsedHistory = history ? JSON.parse(history) : [];
         const chat = geminiModel.startChat({ history: parsedHistory });
         const result = await chat.sendMessage(message);
@@ -78,9 +81,12 @@ app.post('/chat', upload.single('file'), async (req, res) => {
 
     } catch (error) {
         console.error("Multi-AI Error:", error);
-        res.status(500).json({ reply: "The AI is currently busy. Try switching models!" });
+        res.status(500).json({ reply: "I had a glitch processing that model. Try switching back to Gemini!" });
     }
 });
 
+// --- DECLARED ONLY ONCE AT THE END ---
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
+});

@@ -4,6 +4,7 @@ let currentChatId = null;
 const chatList = document.getElementById('chatList');
 const chatLog = document.getElementById('chatLog');
 const input = document.getElementById("messageInput");
+const sendBtn = document.getElementById("sendBtn");
 
 // --- STARTUP LOGIC ---
 if (chats.length > 0) {
@@ -78,7 +79,6 @@ function loadChat(id) {
     chatLog.innerHTML = '';
     
     chat.history.forEach(m => {
-        // Label the AI messages based on the saved role or a default
         const label = m.role === 'user' ? 'You' : (m.modelName || 'AI');
         appendMessage(label, m.parts[0].text);
     });
@@ -88,23 +88,23 @@ function loadChat(id) {
 
 function appendMessage(sender, message) {
     const msgDiv = document.createElement("div");
-    // Dynamic border color based on sender
     const isUser = sender === 'You';
     msgDiv.style = `padding: 15px; margin: 15px 0; border-radius: 12px; border: 1px solid ${isUser ? '#00ffff' : '#333'}; background: ${isUser ? 'rgba(0, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.02)'};`;
 
     let formattedText = message;
     if (!isUser) {
+        // Neon Code Block formatting
         formattedText = message.replace(/```([\s\S]*?)```/g, (match, code) => {
             return `
                 <pre style="position:relative; background:#000; padding:15px; border-radius:8px; border:1px solid #00ffff; color:#00ffff; overflow-x:auto;">
-                    <button class="copy-btn" onclick="copyToClipboard(this)" style="position:absolute; right:10px; top:10px; background:#000; color:#00ffff; border:1px solid #00ffff; cursor:pointer;">Copy</button>
+                    <button class="copy-btn" onclick="copyToClipboard(this)" style="position:absolute; right:10px; top:10px; background:#000; color:#00ffff; border:1px solid #00ffff; cursor:pointer; padding: 4px 8px; font-size: 10px;">Copy</button>
                     <code>${code.trim()}</code>
                 </pre>`;
         });
     }
 
     msgDiv.innerHTML = `<strong style="color:#00ffff; font-size: 1.1em;">${sender}:</strong> 
-                        <div style="margin-top:8px; line-height:1.6;">${formattedText}</div>`;
+                        <div style="margin-top:8px; line-height:1.6; white-space: pre-wrap;">${formattedText}</div>`;
     
     chatLog.appendChild(msgDiv);
     chatLog.scrollTop = chatLog.scrollHeight;
@@ -117,7 +117,6 @@ function copyToClipboard(btn) {
         btn.innerText = "DONE!";
         btn.style.background = "#00ffff";
         btn.style.color = "#000";
-        
         setTimeout(() => {
             btn.innerText = originalText;
             btn.style.background = "#000";
@@ -126,24 +125,26 @@ function copyToClipboard(btn) {
     });
 }
 
-// --- SEND LOGIC (Updated for Multi-AI) ---
-document.getElementById("sendBtn").onclick = async () => {
+// --- SEND LOGIC ---
+sendBtn.onclick = async () => {
     const msg = input.value.trim();
     const fileInput = document.getElementById("fileInput");
     const file = fileInput.files[0];
     
-    // Grab the global selectedModel from index.html logic
     const modelToUse = typeof selectedModel !== 'undefined' ? selectedModel : 'gemini';
     const modelLabel = modelToUse.toUpperCase();
 
     if (!msg && !file) return;
+
+    // Loading State
+    sendBtn.disabled = true;
+    sendBtn.innerText = "WAIT...";
 
     appendMessage("You", msg || `Sent file: ${file.name}`);
     input.value = "";
     
     const chat = chats.find(c => c.id === currentChatId);
     
-    // If it's a new chat, name it after the first message
     if (chat.name === "New Chat" && msg) {
         chat.name = msg.substring(0, 20) + (msg.length > 20 ? "..." : "");
     }
@@ -151,32 +152,36 @@ document.getElementById("sendBtn").onclick = async () => {
     const formData = new FormData();
     formData.append('message', msg);
     formData.append('history', JSON.stringify(chat.history));
-    formData.append('selectedModel', modelToUse); // SENDING MODEL TO SERVER
+    formData.append('selectedModel', modelToUse);
     if (file) formData.append('file', file);
     
     fileInput.value = "";
     document.getElementById('fileStatus').innerText = "";
 
     try {
-        // Change '/chat' to your full Render URL if testing locally
         const res = await fetch("https://aiedits.onrender.com/chat", { 
-    method: "POST", 
-    body: formData 
-     });
-        const data = await res.json();
+            method: "POST", 
+            body: formData 
+        });
         
+        if (!res.ok) throw new Error("Server response not OK");
+        
+        const data = await res.json();
         appendMessage(modelLabel, data.reply);
         
-        // Save to history with the model label
         chat.history.push({ role: "user", parts: [{ text: msg || `[File: ${file.name}]` }] });
         chat.history.push({ 
             role: "model", 
-            modelName: modelLabel, // Custom property to remember which AI replied
+            modelName: modelLabel, 
             parts: [{ text: data.reply }] 
         });
         saveChats();
     } catch (e) {
-        appendMessage("SYSTEM", "Error connecting to AI server. Try again later.");
+        console.error("Fetch error:", e);
+        appendMessage("SYSTEM", "Error connecting to AI server. Make sure the Render service is awake!");
+    } finally {
+        sendBtn.disabled = false;
+        sendBtn.innerText = "Send";
     }
 };
 

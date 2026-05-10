@@ -8,7 +8,11 @@ require('dotenv').config();
 const app = express();
 const upload = multer({ limits: { fileSize: 5 * 1024 * 1024 } });
 
-app.use(cors());
+app.use(cors({
+    origin: "*", // Allows any website to talk to your server
+    methods: ["GET", "POST"],
+    allowedHeaders: ["Content-Type"]
+}));
 app.use(express.json());
 app.use(express.static('.'));
 

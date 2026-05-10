@@ -20,12 +20,12 @@ const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
 const CLAUDE_KEY = process.env.CLAUDE_API_KEY || "";
 const GPT_KEY = process.env.GPT_API_KEY || "";
 
-const SYSTEM_PROMPT = "You are AiEdits. Expert in Roblox Luau, Minecraft Skript, and Web Dev. Use triple backticks for code. Dont always answer with code";
+const SYSTEM_PROMPT = "You are AiEdits. Expert in Roblox Luau, Minecraft Skript, and Web Dev. Use triple backticks for code.";
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
 const gemini35 = genAI.getGenerativeModel(
-    { model: "gemini-3.5-flash", systemInstruction: SYSTEM_PROMPT }, // FIX: use real model name; update if Gemini 3.5 Flash is released
+    { model: "gemini-2.5-flash", systemInstruction: SYSTEM_PROMPT }, // FIX: use real model name; update if Gemini 3.5 Flash is released
     { apiVersion: 'v1beta' }
 );
 
@@ -52,17 +52,11 @@ app.post('/chat', upload.single('file'), async (req, res) => {
 
         // --- OPTION 1: GPT ---
         // FIX: "gpt-5.5" does not exist. Use "gpt-4.1" or "o4-mini" (check platform.openai.com for latest).
-        // We also now pass conversation history so GPT remembers the chat.
+        // The frontend already converts history to { role: "user"/"assistant", content: string } for GPT.
         if (selectedModel === "gpt") {
-            // Convert history to OpenAI format (role: "user"/"assistant", content: string)
             const openAiMessages = [
                 { role: "system", content: SYSTEM_PROMPT },
-                ...parsedHistory.map(m => ({
-                    role: m.role === "model" ? "assistant" : m.role,
-                    content: typeof m.content === "string"
-                        ? m.content
-                        : m.content?.[0]?.text || ""
-                })),
+                ...parsedHistory, // already in correct format from frontend
                 { role: "user", content: message }
             ];
 
@@ -73,7 +67,7 @@ app.post('/chat', upload.single('file'), async (req, res) => {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    model: "gpt-5.5", // FIX: "gpt-5.5" does not exist — update this when it releases
+                    model: "gpt-4.1", // FIX: "gpt-5.5" does not exist — update this when it releases
                     messages: openAiMessages
                 })
             });
@@ -88,14 +82,9 @@ app.post('/chat', upload.single('file'), async (req, res) => {
         // FIX: max_tokens raised from 2048 → 8192 to avoid mid-response cuts
         // FIX: Now passes conversation history so Claude remembers the chat
         if (selectedModel === "claude") {
-            // Convert history to Anthropic format (alternating user/assistant roles)
+            // The frontend already converts history to { role: "user"/"assistant", content: string } for Claude.
             const claudeMessages = [
-                ...parsedHistory.map(m => ({
-                    role: m.role === "model" ? "assistant" : m.role,
-                    content: typeof m.content === "string"
-                        ? m.content
-                        : m.content?.[0]?.text || ""
-                })),
+                ...parsedHistory, // already in correct format from frontend
                 { role: "user", content: message }
             ];
 

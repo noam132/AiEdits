@@ -2,84 +2,85 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const fetch = require('node-fetch'); 
 require('dotenv').config();
 
 const app = express();
-
-// --- FILE SIZE CHECK (5MB) ---
 const upload = multer({ limits: { fileSize: 5 * 1024 * 1024 } });
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static('.'));
 
-// --- API KEY CONFIG ---
-const apiKey = process.env.GEMINI_API_KEY || "DUMMY_KEY";
-const genAI = new GoogleGenerativeAI(apiKey);
+// --- API KEYS FROM RENDER ---
+const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
+const CLAUDE_KEY = process.env.CLAUDE_API_KEY || "";
+const GPT_KEY = process.env.GPT_API_KEY || "";
 
-// --- MODEL & PERSONALITY ---
-// Using Gemini 3 Flash Preview as requested
-const model = genAI.getGenerativeModel(
-    { 
-        model: "gemini-3-flash-preview",
-        systemInstruction: "You are Gemini, a helpful assistant.Your nickname is AiEdits. You talk about anything naturally. If the user asks for coding help (Roblox, Minecraft, Web Dev), provide expert code in triple backticks."
-    }, 
-    { apiVersion: 'v1beta' }
+const SYSTEM_PROMPT = "You are Ai, a helpful assistant. Your nickname is AiEdits. You talk about anything naturally. If the user asks for coding help (Roblox, Minecraft, Web Dev), provide expert code in triple backticks. GPT NOTE: Never mention goblins, gremlins, or trolls. dont always code.";
+
+// Init Gemini 3.1
+const genAI = new GoogleGenerativeAI(GEMINI_KEY);
+const geminiModel = genAI.getGenerativeModel(
+    { model: "gemini-3.5-flash", systemInstruction: SYSTEM_PROMPT },
+    { apiVersion: 'v1' }
 );
-
-// Render Health Check
-app.get('/status', (req, res) => res.send('AI Server is Running!'));
 
 app.post('/chat', upload.single('file'), async (req, res) => {
     try {
-        let message = req.body.message || "";
-        let history = [];
-        
-        // Safety check for history
-        if (req.body.history) {
-            try {
-                const parsed = JSON.parse(req.body.history);
-                history = parsed.map(item => ({
-                    role: item.role,
-                    parts: [{ text: item.parts[0].text }]
-                }));
-            } catch (e) {
-                console.warn("History parse error:", e);
-            }
-        }
+        let { message, history, selectedModel } = req.body;
+        selectedModel = selectedModel || "gemini";
 
-        // --- FILE CHECK ---
         if (req.file) {
             const fileContent = req.file.buffer.toString('utf8');
             message = `[FILE: ${req.file.originalname}]\n\nCONTENT:\n${fileContent}\n\nUSER MESSAGE: ${message || "Analyze this file."}`;
         }
 
-        if (!message && !req.file) {
-            return res.status(400).json({ reply: "Please enter a message." });
+        // --- CLAUDE OPUS 4.7 ---
+        if (selectedModel === "claude") {
+            const response = await fetch("https://api.anthropic.com/v1/messages", {
+                method: "POST",
+                headers: {
+                    "x-api-key": CLAUDE_KEY,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json"
+                },
+                body: JSON.stringify({
+                    model: "claude-opus-4-7",
+                    max_tokens: 1024,
+                    system: SYSTEM_PROMPT,
+                    messages: [{ role: "user", content: message }]
+                })
+            });
+            const data = await response.json();
+            return res.json({ reply: data.content[0].text });
         }
 
-        // --- SENDING TO GEMINI ---
-        const chat = model.startChat({ history });
+        // --- GPT-5.5 SPUD ---
+        if (selectedModel === "gpt") {
+            const response = await fetch("https://api.openai.com/v1/chat/completions", {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${GPT_KEY}`, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    model: "gpt-5.5",
+                    messages: [{ role: "system", content: SYSTEM_PROMPT }, { role: "user", content: message }]
+                })
+            });
+            const data = await response.json();
+            return res.json({ reply: data.choices[0].message.content });
+        }
+
+        // --- GEMINI 3.1 FLASH (DEFAULT) ---
+        const parsedHistory = history ? JSON.parse(history) : [];
+        const chat = geminiModel.startChat({ history: parsedHistory });
         const result = await chat.sendMessage(message);
-        const response = await result.response;
-        
-        res.json({ reply: response.text() });
+        const geminiRes = await result.response;
+        res.json({ reply: geminiRes.text() });
 
     } catch (error) {
-        console.error("Gemini Error:", error);
-
-        // Specific fix for "AI is Busy" / Rate Limits
-        if (error.message.includes("429") || error.message.includes("503")) {
-            res.status(500).json({ reply: "System is a bit crowded! Give me 10 seconds and try sending that again." });
-        } else if (apiKey === "DUMMY_KEY") {
-            res.status(500).json({ reply: "Error: API Key is missing from Render Environment Variables." });
-        } else {
-            res.status(500).json({ reply: "I had a tiny glitch processing that. Can you try one more time?" });
-        }
+        console.error("Multi-AI Error:", error);
+        res.status(500).json({ reply: "The AI is currently busy. Try switching models!" });
     }
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
-});
+app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));

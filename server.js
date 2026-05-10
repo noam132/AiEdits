@@ -113,7 +113,9 @@ app.post('/chat', upload.single('file'), async (req, res) => {
                 })
             });
             const data = await response.json();
-            if (data.error) throw new Error(`OpenAI API error: ${data.error.message}`);
+            console.log('[GPT] status:', response.status, JSON.stringify(data).slice(0, 300));
+            if (data.error) throw new Error(`OpenAI: ${data.error.message} (${data.error.type || 'unknown'})`);
+            if (!data.choices?.[0]?.message?.content) throw new Error(`OpenAI unexpected response: ${JSON.stringify(data).slice(0, 200)}`);
             return res.json({ reply: data.choices[0].message.content });
         }
 
@@ -139,7 +141,9 @@ app.post('/chat', upload.single('file'), async (req, res) => {
                 })
             });
             const data = await response.json();
-            if (data.error) throw new Error(`Claude API error: ${data.error.message}`);
+            console.log('[Claude] status:', response.status, JSON.stringify(data).slice(0, 300));
+            if (data.error) throw new Error(`Claude: ${data.error.message} (${data.error.type || 'unknown'})`);
+            if (!data.content?.[0]?.text) throw new Error(`Claude unexpected response: ${JSON.stringify(data).slice(0, 200)}`);
             return res.json({ reply: data.content[0].text });
         }
 

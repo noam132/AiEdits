@@ -210,9 +210,14 @@ sendBtn.onclick = async () => {
             body: formData
         });
 
-        if (!res.ok) throw new Error(`Server error: ${res.status}`);
-
+        // Always parse JSON even on errors — server sends { reply: "SERVER ERROR: ..." }
+        // so we can show the real error message instead of just "500"
         const data = await res.json();
+
+        if (!res.ok) {
+            throw new Error(data.reply || `Server error ${res.status}`);
+        }
+
         appendMessage(modelLabel, data.reply);
 
         // FIX: store in new unified format { role, text, modelName }

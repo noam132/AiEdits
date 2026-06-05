@@ -16,8 +16,8 @@ const SYSTEM_PROMPT = "You are AiEdits. Expert in Roblox Luau, Minecraft Skript,
 
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
 const geminiModel = genAI.getGenerativeModel(
-    { model: "gemini-3-flash", systemInstruction: SYSTEM_PROMPT },
-    { apiVersion: 'v1beta' }
+    { model: "gemini-3.5-flash", systemInstruction: SYSTEM_PROMPT },
+    { apiVersion: 'v1' }
 );
 
 app.get('/status', (req, res) => res.send('AiEdits Server is Online'));

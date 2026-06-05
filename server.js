@@ -12,12 +12,12 @@ app.use(express.json());
 app.use(express.static('.'));
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
-const SYSTEM_PROMPT = "You are AiEdits. Expert in Roblox Luau, Minecraft Skript, and Web Dev. Use triple backticks for code.";
+const SYSTEM_PROMPT = "You are AiEdits. An intelligant Ai be helpful. Use triple backticks for code.";
 
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
 const geminiModel = genAI.getGenerativeModel(
     { model: "gemini-3.5-flash", systemInstruction: SYSTEM_PROMPT },
-    { apiVersion: 'v1' }
+    { apiVersion: 'v1beta' }
 );
 
 app.get('/status', (req, res) => res.send('AiEdits Server is Online'));
